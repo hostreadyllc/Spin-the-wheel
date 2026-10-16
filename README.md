@@ -22,7 +22,8 @@ A decision-maker wheel for Android. Package name: `com.ash.spinthewheel`.
 | `web/fonts/` | Bundled Baloo 2 and Nunito Sans fonts (SIL Open Font License) |
 | `android/AndroidManifest.xml` | Manifest: VIBRATE permission only, portrait, min SDK 24, target SDK 36 |
 | `android/res/` | App name, theme colours, launcher icons |
-| `android/tools/build_dex.py` | Generates `classes.dex`: a full-screen WebView activity plus the vibration bridge (Java equivalent in the file header) |
+| `android/smali/` | Native code in smali: `MainActivity` (full-screen offline WebView) and `Bridge` (vibration) |
+| `android/tools/Asm.java` | Assembles the smali into `classes.dex` using apktool's smali library |
 | `android/tools/zipalign.py` | Aligns the APK before signing |
 | `android/tools/Sign.java` | Signs the APK (v2 + v3) with apksig |
 | `android/tools/make_icons.py` | Redraws the launcher icons and the 512px store icon |
@@ -36,21 +37,23 @@ Requirements: Java 17 or newer, Python 3, and three Android tools:
 - `aapt2` (Android build-tools)
 - `android.jar` for API 36
 - `bundletool-all.jar`
+- `apktool_2.x.jar` (for its smali assembler)
 
 ```bash
 export AAPT2=/path/to/aapt2
 export ANDROID_JAR=/path/to/android-36.jar
 export BUNDLETOOL=/path/to/bundletool-all.jar
+export APKTOOL=/path/to/apktool_2.4.1.jar
 export KEYSTORE=/path/to/spinthewheel-upload.jks
 export STORE_PASS='your-keystore-password'
-VERSION_CODE=2 VERSION_NAME=1.1 ./android/build.sh
+VERSION_CODE=3 VERSION_NAME=1.1 ./android/build.sh
 ```
 
 Increase `VERSION_CODE` for every Play Store upload.
 
 ## How it works
 
-The native layer is deliberately tiny. `MainActivity` opens a full-screen WebView that loads `file:///android_asset/index.html?app=1`. The page detects `app=1` and does three things: it calls the native vibrator through `prompt("vib", ms)`, which `Bridge.onJsPrompt` intercepts; it turns on shake detection automatically through `devicemotion`; and it hides the browser-only "Enable shake" button.
+The native layer is deliberately tiny. `MainActivity` opens a full-screen WebView that loads `file:///android_asset/index.html`. The page detects the `android_asset` address and does three things: it calls the native vibrator through `prompt("vib", ms)`, which `Bridge.onJsPrompt` intercepts; it turns on shake detection automatically through `devicemotion`; and it hides the browser-only "Enable shake" button.
 
 ## Before publishing to Google Play
 

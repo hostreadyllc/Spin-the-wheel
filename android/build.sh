@@ -6,24 +6,26 @@
 #   AAPT2       aapt2 binary (Android build-tools)
 #   ANDROID_JAR platform android.jar (API 36)
 #   BUNDLETOOL  bundletool-all-*.jar (also provides the apksig signer)
+#   APKTOOL     apktool_2.x.jar (provides the smali assembler)
 # Signing:
 #   KEYSTORE, KEY_ALIAS, STORE_PASS   (the upload key; never commit it)
 #
 # Usage: VERSION_CODE=1 VERSION_NAME=1.0 ./android/build.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
-: "${AAPT2:?set AAPT2}" "${ANDROID_JAR:?set ANDROID_JAR}" "${BUNDLETOOL:?set BUNDLETOOL}"
+: "${AAPT2:?set AAPT2}" "${ANDROID_JAR:?set ANDROID_JAR}" "${BUNDLETOOL:?set BUNDLETOOL}" "${APKTOOL:?set APKTOOL}"
 : "${KEYSTORE:?set KEYSTORE}" "${KEY_ALIAS:=upload}" "${STORE_PASS:?set STORE_PASS}"
-VERSION_CODE="${VERSION_CODE:-1}"
-VERSION_NAME="${VERSION_NAME:-1.0}"
+VERSION_CODE="${VERSION_CODE:-2}"
+VERSION_NAME="${VERSION_NAME:-1.0.1}"
 MIN_SDK=24
 TARGET_SDK=36
 OUT=dist
 B=build
 rm -rf "$B" && mkdir -p "$B" "$OUT"
 
-echo "1/6 native code -> classes.dex"
-python3 android/tools/build_dex.py "$B/classes.dex"
+echo "1/6 native code (android/smali) -> classes.dex"
+javac -nowarn -cp "$APKTOOL" -d "$B" android/tools/Asm.java
+java -cp "$APKTOOL:$B" Asm android/smali "$B/classes.dex" $MIN_SDK
 
 echo "2/6 compile resources"
 "$AAPT2" compile --dir android/res -o "$B/res.zip"

@@ -295,7 +295,7 @@ function fanfare(){
     o.type="square"; o.frequency.value=f; g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(0.12,t0+0.02); g.gain.exponentialRampToValueAtTime(0.001,t0+(i===3?0.6:0.2));
     o.connect(g).connect(a.destination); o.start(t0); o.stop(t0+0.65); });
 }
-const IS_APP = /[?&]app=1/.test(location.search);
+const IS_APP = location.href.indexOf("android_asset") !== -1;
 function nativeVib(ms){ try{ prompt("vib", String(Math.max(1, Math.round(ms)))); }catch(e){} }
 function buzz(p){
   if(!S.vibe) return;
