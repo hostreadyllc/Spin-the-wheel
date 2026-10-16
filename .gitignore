@@ -1,0 +1,7 @@
+build/
+dist/
+*.jks
+*.keystore
+.pass
+key-info*.txt
+__pycache__/

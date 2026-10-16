@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Spin the Wheel</title>
+<style>
+@font-face{font-family:"Baloo 2";font-weight:600;font-display:swap;src:url(fonts/baloo-2-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"Baloo 2";font-weight:800;font-display:swap;src:url(fonts/baloo-2-latin-800-normal.woff2) format("woff2")}
+@font-face{font-family:"Nunito Sans";font-weight:400;font-display:swap;src:url(fonts/nunito-sans-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Nunito Sans";font-weight:600;font-display:swap;src:url(fonts/nunito-sans-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"Nunito Sans";font-weight:800;font-display:swap;src:url(fonts/nunito-sans-latin-800-normal.woff2) format("woff2")}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+img{max-width:100%}
+
+/* Layout: one-screen app — top bar, wheel fills all remaining space, thumb-zone spin button. Single-look design; each wheel theme repaints the whole screen. */
+:root{
+  --bg1:#1b1035; --bg2:#3a1a5e; --ink:#fff7fb; --muted:rgba(255,247,251,.68);
+  --panel:rgba(255,255,255,.10); --panel-line:rgba(255,255,255,.18);
+  --cta:#ff3d7f; --cta-ink:#fff; --sheet:#24163f;
+  --display:"Baloo 2","Trebuchet MS",system-ui,sans-serif;
+  --body:"Nunito Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{margin:0;background:var(--bg1);color:var(--ink);font-family:var(--body);overflow:hidden;-webkit-tap-highlight-color:transparent;user-select:none}
+.app{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr) auto;grid-template-columns:minmax(0,1fr);background:radial-gradient(120% 80% at 50% 40%,var(--bg2),var(--bg1));transition:background .4s;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 14px;box-sizing:border-box}
+header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:800;font-size:1.45rem;line-height:1;margin:0;flex:1;min-width:0;letter-spacing:.01em}
+h1 small{display:block;font-family:var(--body);font-weight:600;font-size:.72rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-top:4px}
+.iconbtn{width:42px;height:42px;border-radius:50%;border:1px solid var(--panel-line);background:var(--panel);color:var(--ink);font-size:1.1rem;display:grid;place-items:center;cursor:pointer}
+.iconbtn[aria-pressed="false"]{opacity:.45}
+button:focus-visible,input:focus-visible{outline:3px solid var(--cta);outline-offset:2px}
+.count{display:flex;align-items:center;gap:8px;margin-top:12px;justify-content:center}
+.count span{font-size:.78rem;color:var(--muted);font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-right:4px}
+.chip{min-width:38px;height:38px;border-radius:12px;border:1px solid var(--panel-line);background:var(--panel);color:var(--ink);font:800 1rem var(--body);cursor:pointer}
+.chip[aria-checked="true"]{background:var(--ink);color:var(--bg1);border-color:var(--ink)}
+.stage{position:relative;min-height:0;min-width:0;overflow:hidden;display:grid;place-items:center;padding-block:8px}
+.wheelwrap{position:relative}
+canvas{display:block;touch-action:manipulation;cursor:pointer}
+.pointer{position:absolute;left:50%;top:-6px;transform:translateX(-50%);width:0;height:0;border-left:18px solid transparent;border-right:18px solid transparent;border-top:34px solid var(--ink);filter:drop-shadow(0 3px 4px rgba(0,0,0,.45));z-index:2}
+.pointer.bump{animation:bump .09s}
+@keyframes bump{50%{transform:translateX(-50%) rotate(-14deg)}}
+footer{display:grid;gap:10px}
+.spin{height:62px;border:0;border-radius:20px;background:var(--cta);color:var(--cta-ink);font:800 1.5rem var(--display);letter-spacing:.06em;cursor:pointer;box-shadow:0 8px 0 rgba(0,0,0,.25);transition:transform .08s,box-shadow .08s}
+.spin:active{transform:translateY(4px);box-shadow:0 4px 0 rgba(0,0,0,.25)}
+.spin:disabled{opacity:.6}
+.row{display:flex;gap:10px}
+.ghost{flex:1;height:46px;border-radius:14px;border:1px solid var(--panel-line);background:var(--panel);color:var(--ink);font:700 .95rem var(--body);cursor:pointer}
+.hint{text-align:center;font-size:.8rem;color:var(--muted);margin:0}
+/* sheets */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--sheet);color:var(--ink);width:100%;max-width:520px;max-height:82%;overflow:auto;border-radius:24px 24px 0 0;box-sizing:border-box;
+  padding:20px max(18px,env(safe-area-inset-left,0px)) calc(20px + env(safe-area-inset-bottom,0px));animation:up .25s ease-out}
+@keyframes up{from{transform:translateY(40px);opacity:0}}
+.sheet h2{font-family:var(--display);font-size:1.4rem;margin:0 0 4px}
+.sheet p.sub{margin:0 0 16px;color:var(--muted);font-size:.88rem}
+.names{display:grid;gap:10px}
+.names label{display:flex;align-items:center;gap:10px}
+.dot{width:26px;height:26px;border-radius:50%;flex:none;display:grid;place-items:center;font:800 .75rem var(--body);color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.names input{flex:1;min-width:0;height:46px;border-radius:12px;border:1px solid var(--panel-line);background:rgba(255,255,255,.07);color:var(--ink);font:600 1.05rem var(--body);padding:0 14px;user-select:text}
+.themes{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px}
+.theme{position:relative;border:2px solid transparent;border-radius:16px;padding:10px;background:rgba(255,255,255,.06);color:var(--ink);cursor:pointer;text-align:left;font:700 .9rem var(--body)}
+.theme[aria-checked="true"]{border-color:var(--ink)}
+.theme canvas{width:100%;height:auto;aspect-ratio:1;margin-bottom:8px}
+.badge{position:absolute;top:8px;right:8px;font-size:.66rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;border-radius:99px;background:#ffc93c;color:#2b1a00}
+.badge.free{background:rgba(255,255,255,.18);color:var(--ink)}
+.sectionlabel{font-size:.74rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:18px 0 10px}
+.done{margin-top:18px;width:100%}
+.modes{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px;flex-wrap:wrap;font-size:.86rem;font-weight:700}
+.switch{display:inline-flex;align-items:center;gap:10px;cursor:pointer;padding:6px 12px 6px 6px;border-radius:99px;background:var(--panel);border:1px solid var(--panel-line)}
+.switch input{appearance:none;-webkit-appearance:none;width:40px;height:24px;border-radius:99px;background:rgba(255,255,255,.22);position:relative;margin:0;cursor:pointer;transition:background .2s}
+.switch input::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .2s}
+.switch input:checked{background:var(--cta)}
+.switch input:checked::after{transform:translateX(16px)}
+.elimstat{color:var(--muted);display:inline-flex;align-items:center;gap:8px}
+.link{background:none;border:0;color:var(--ink);font:800 .86rem var(--body);text-decoration:underline;cursor:pointer;padding:4px}
+.outlist{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:-8px 0 16px}
+.outlist span{font-size:.78rem;padding:3px 9px;border-radius:99px;background:rgba(255,255,255,.1);text-decoration:line-through;color:var(--muted)}
+/* result */
+.result{position:fixed;inset:0;z-index:30;display:grid;place-items:center;background:rgba(0,0,0,.6);padding:24px}
+.card{background:var(--sheet);border-radius:28px;padding:28px 24px;text-align:center;width:100%;max-width:360px;box-sizing:border-box;animation:pop .35s cubic-bezier(.2,1.6,.4,1)}
+@keyframes pop{from{transform:scale(.6);opacity:0}}
+.card .eyebrow{font-size:.78rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.card .winner{font-family:var(--display);font-weight:800;font-size:clamp(2rem,10vw,3.2rem);line-height:1.05;margin:8px 0 20px;word-break:break-word}
+.card .row{flex-direction:column}
+.card .row > button{flex:none}
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:31}
+.premium-box{margin-top:16px;padding:16px;border-radius:16px;background:linear-gradient(135deg,rgba(255,201,60,.18),rgba(255,61,127,.18));border:1px solid rgba(255,201,60,.4)}
+.premium-box strong{font-family:var(--display);font-size:1.15rem}
+.premium-box p{margin:6px 0 12px;font-size:.86rem;color:var(--muted)}
+.gold{background:#ffc93c;color:#2b1a00;border:0}
+@media (prefers-reduced-motion:reduce){.sheet,.card,.pointer.bump{animation:none}}
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <div>
+    <header>
+      <h1>Spin the Wheel<small>Decision maker</small></h1>
+      <button class="iconbtn" id="soundBtn" aria-pressed="true" aria-label="Sound" title="Sound">🔊</button>
+      <button class="iconbtn" id="vibeBtn" aria-pressed="true" aria-label="Vibration" title="Vibration">📳</button>
+      <button class="iconbtn" id="themeBtn" aria-label="Themes" title="Themes">🎨</button>
+    </header>
+    <div class="count" role="radiogroup" aria-label="How many on the wheel" id="countRow"><span>Players</span></div>
+    <div class="modes">
+      <label class="switch"><input type="checkbox" id="elimToggle"> Eliminator mode</label>
+      <span class="elimstat" id="elimStat" hidden><span id="elimLeft"></span><button class="link" id="elimReset">Reset</button></span>
+    </div>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="wheelwrap" id="wrap">
+      <div class="pointer" id="pointer"></div>
+      <canvas id="wheel" aria-label="Decision wheel. Tap to spin."></canvas>
+    </div>
+  </div>
+
+  <footer>
+    <button class="spin" id="spinBtn">SPIN</button>
+    <div class="row">
+      <button class="ghost" id="editBtn" style="flex:1">✏️ Edit names</button>
+      <button class="ghost" id="shakeBtn">📱 Enable shake</button>
+    </div>
+    <p class="hint" id="hint">Tap SPIN, tap the wheel, or shake your phone</p>
+  </footer>
+</div>
+
+<div class="scrim" id="namesSheet" hidden>
+  <div class="sheet" role="dialog" aria-label="Edit names">
+    <h2>Who's on the wheel?</h2>
+    <p class="sub">Names, numbers, emoji, any symbol your keyboard has. Up to 16 characters.</p>
+    <div class="names" id="namesList"></div>
+    <button class="spin done" id="namesDone">Done</button>
+  </div>
+</div>
+
+<div class="scrim" id="themeSheet" hidden>
+  <div class="sheet" role="dialog" aria-label="Themes">
+    <h2>Themes</h2>
+    <p class="sub">Pick a look for your wheel.</p>
+    <div class="sectionlabel">Free</div>
+    <div class="themes" id="freeThemes"></div>
+    <div class="sectionlabel">Premium</div>
+    <div class="themes" id="proThemes"></div>
+    <div class="premium-box" id="premiumBox">
+      <strong>Unlock Premium</strong>
+      <p>All premium themes, future theme drops, and no ads. In the store app this is a one-time purchase.</p>
+      <button class="ghost gold" id="unlockBtn" style="width:100%">Unlock (demo, no charge)</button>
+    </div>
+    <button class="spin done" id="themeDone">Done</button>
+  </div>
+</div>
+
+<div class="result" id="result" hidden>
+  <div class="card" role="dialog" aria-live="assertive">
+    <div class="eyebrow">The wheel has chosen</div>
+    <div class="winner" id="winner"></div>
+    <div class="outlist" id="outList" hidden></div>
+    <div class="row">
+      <button class="spin" id="removeBtn" hidden>KNOCK OUT &amp; SPIN</button>
+      <button class="spin" id="newRoundBtn" hidden>NEW ROUND</button>
+      <button class="spin" id="againBtn">SPIN AGAIN</button>
+      <button class="ghost" id="closeBtn">Close</button>
+    </div>
+  </div>
+</div>
+<canvas id="confetti"></canvas>
+
+<script>
+(() => {
+const THEMES = [
+  {id:"candy", name:"Candy Pop", pro:false, bg:["#1b1035","#3a1a5e"], sheet:"#24163f", cta:"#ff3d7f", rim:"#fff7fb", hub:"#ff3d7f", text:"#ffffff",
+   segs:["#ff3d7f","#ffb03b","#2ec4b6","#7b5cff","#ff6b3d","#3da5ff","#9be15d","#f15bb5"]},
+  {id:"ocean", name:"Lagoon", pro:false, bg:["#04263a","#0b4a63"], sheet:"#0a3448", cta:"#00c2a8", rim:"#e6fbff", hub:"#00c2a8", text:"#ffffff",
+   segs:["#0096c7","#00b4a0","#48cae4","#0077b6","#06d6a0","#118ab2","#38b6ff","#2a9d8f"]},
+  {id:"paper", name:"Chalk", pro:false, bg:["#1f2321","#33403a"], sheet:"#2a302d", cta:"#f3efe2", ctaInk:"#1f2321", rim:"#f3efe2", hub:"#f3efe2", text:"#1f2321",
+   segs:["#f3efe2","#c9d6c2","#e8c9a0","#b8cfd9","#f0d58c","#d9b8c9","#a9c4a2","#e2ddd0"]},
+  {id:"neon", name:"Neon Arcade", pro:true, bg:["#05010d","#170733"], sheet:"#140826", cta:"#39ff88", ctaInk:"#05010d", rim:"#39ff88", hub:"#ff2bd6", text:"#ffffff", glow:true,
+   segs:["#ff2bd6","#00e5ff","#39ff88","#ffe600","#8a2bff","#ff6b00","#00ffc3","#ff2b5e"]},
+  {id:"gold", name:"Royal Gold", pro:true, bg:["#120b02","#3b2608"], sheet:"#24180a", cta:"#e8b84a", ctaInk:"#1c1203", rim:"#f5d27a", hub:"#e8b84a", text:"#1c1203", metal:true,
+   segs:["#e8b84a","#2b1c08","#d9a43a","#3d2a0e","#f2c766","#20150a","#c99530","#4a3412"], alt:"#f5d27a"},
+  {id:"sunset", name:"Desert Sunset", pro:true, bg:["#2a0f1c","#6a2335"], sheet:"#3a1424", cta:"#ff8a3d", rim:"#ffe3c7", hub:"#ff8a3d", text:"#ffffff",
+   segs:["#ff5e5b","#ff8a3d","#ffb84d","#d64560","#a3336b","#ff7a7a","#f2a65a","#7a2a5c"]},
+  {id:"galaxy", name:"Galaxy", pro:true, bg:["#03031a","#1a0f4d"], sheet:"#110c33", cta:"#8c7bff", rim:"#cfc8ff", hub:"#8c7bff", text:"#ffffff", stars:true,
+   segs:["#3b2c9e","#6a3fd1","#1f5fbf","#9b4dcc","#2a2a8f","#5d6bff","#4b1f8c","#7b8cff"]},
+];
+const DEFAULT_NAMES = ["Aisha","Omar","Priya","Leo","Sara","Yusuf","Mei","Karim"];
+
+const store = {
+  get(k,d){ try{ const v = localStorage.getItem("stw_"+k); return v==null?d:JSON.parse(v);}catch(e){return d;} },
+  set(k,v){ try{ localStorage.setItem("stw_"+k, JSON.stringify(v)); }catch(e){} }
+};
+const S = {
+  n: store.get("n",6), names: store.get("names",DEFAULT_NAMES.slice()), theme: store.get("theme","candy"),
+  premium: store.get("premium",false), sound: store.get("sound",true), vibe: store.get("vibe",true),
+  rot: 0, spinning:false, elim: store.get("elim",false), out: []
+};
+if (S.names.length < 8) S.names = S.names.concat(DEFAULT_NAMES.slice(S.names.length));
+const theme = () => THEMES.find(t=>t.id===S.theme) || THEMES[0];
+const $ = id => document.getElementById(id);
+const cvs = $("wheel"), ctx = cvs.getContext("2d");
+let size = 300;
+
+/* ---------- theme ---------- */
+function applyTheme(){
+  const t = theme(), r = document.documentElement.style;
+  r.setProperty("--bg1",t.bg[0]); r.setProperty("--bg2",t.bg[1]); r.setProperty("--sheet",t.sheet);
+  r.setProperty("--cta",t.cta); r.setProperty("--cta-ink",t.ctaInk||"#fff"); r.setProperty("--ink",t.rim);
+  document.body.style.background = t.bg[0];
+  draw();
+}
+
+/* ---------- wheel drawing ---------- */
+function active(){ const a=[]; for(let i=0;i<S.n;i++) if(!S.elim || !S.out.includes(i)) a.push(i); return a; }
+function label(i){ const s=(S.names[i]||"").trim(); return s || String(i+1); }
+function drawWheel(c, sz, rot, t, n, withText){
+  const dpr = c===cvs ? (window.devicePixelRatio||1) : 1;
+  c.width = sz*dpr; c.height = sz*dpr;
+  const g = c.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0);
+  const map = c===cvs ? active() : null;
+  const R = sz/2, cx=R, cy=R, rim = Math.max(6, sz*0.035), r = R - rim - 2, seg = Math.PI*2/n;
+  g.clearRect(0,0,sz,sz);
+  // rim
+  g.beginPath(); g.arc(cx,cy,R-2,0,Math.PI*2); g.fillStyle=t.rim;
+  if (t.glow){ g.shadowColor=t.rim; g.shadowBlur=sz*0.05; }
+  g.fill(); g.shadowBlur=0;
+  for(let i=0;i<n;i++){
+    const a0 = rot + i*seg - Math.PI/2, a1 = a0+seg;
+    g.beginPath(); g.moveTo(cx,cy); g.arc(cx,cy,r,a0,a1); g.closePath();
+    const idx = map ? map[i] : i;
+    let col = t.segs[idx % t.segs.length];
+    if (n%2===1 && i===n-1 && t.metal) col = t.alt; // avoid two same in a row on odd counts
+    if (t.metal || t.glow || t.stars){
+      const gr = g.createRadialGradient(cx,cy,r*0.15,cx,cy,r);
+      gr.addColorStop(0, shade(col,t.glow?-40:25)); gr.addColorStop(1,col); g.fillStyle=gr;
+    } else g.fillStyle = col;
+    g.fill();
+    g.strokeStyle = t.glow? "rgba(255,255,255,.35)" : "rgba(0,0,0,.18)"; g.lineWidth = Math.max(1,sz*0.004); g.stroke();
+    if (withText){
+      g.save(); g.translate(cx,cy); g.rotate(a0+seg/2);
+      let fs = Math.min(sz*0.07, r*seg*0.42); fs = Math.max(fs, 11);
+      g.font = `800 ${fs}px "Nunito Sans", system-ui, sans-serif`;
+      const isDarkSeg = luminance(col) < 0.45;
+      g.fillStyle = t.metal ? (isDarkSeg ? t.alt : "#1c1203") : (t.id==="paper" ? t.text : (isDarkSeg || t.text==="#ffffff" ? "#ffffff" : t.text));
+      g.textAlign="right"; g.textBaseline="middle";
+      if (g.fillStyle.toLowerCase()==="#ffffff"){ g.shadowColor="rgba(0,0,0,.45)"; g.shadowBlur=3; }
+      const maxW = r*0.66, full = label(idx); let s = full;
+      while (g.measureText(s).width > maxW && s.length>1) s = s.slice(0,-1);
+      if (s !== full) s = s.slice(0,-1)+"…";
+      g.fillText(s, r*0.9, 0);
+      g.restore();
+    }
+  }
+  if (t.stars){
+    g.save(); g.beginPath(); g.arc(cx,cy,r,0,Math.PI*2); g.clip(); g.fillStyle="rgba(255,255,255,.75)";
+    for(let k=0;k<60;k++){ const a=k*2.399+rot, d=r*((k*37%100)/100); g.beginPath(); g.arc(cx+Math.cos(a)*d,cy+Math.sin(a)*d,(k%3+1)*sz*0.0018,0,7); g.fill(); }
+    g.restore();
+  }
+  // rim studs
+  for(let i=0;i<n*2;i++){ const a=rot+i*seg/2-Math.PI/2; g.beginPath(); g.arc(cx+Math.cos(a)*(R-rim/2-2),cy+Math.sin(a)*(R-rim/2-2),rim*0.22,0,7); g.fillStyle = i%2? "rgba(0,0,0,.25)":"rgba(255,255,255,.9)"; g.fill(); }
+  // hub
+  g.beginPath(); g.arc(cx,cy,r*0.13,0,Math.PI*2); g.fillStyle=t.rim; g.fill();
+  g.beginPath(); g.arc(cx,cy,r*0.09,0,Math.PI*2); g.fillStyle=t.hub; g.fill();
+}
+function shade(hex,amt){ const n=parseInt(hex.slice(1),16); let r=(n>>16)+amt,g=((n>>8)&255)+amt,b=(n&255)+amt; r=Math.max(0,Math.min(255,r));g=Math.max(0,Math.min(255,g));b=Math.max(0,Math.min(255,b)); return "#"+((r<<16)|(g<<8)|b).toString(16).padStart(6,"0"); }
+function luminance(hex){ const n=parseInt(hex.slice(1),16); return (0.299*(n>>16)+0.587*((n>>8)&255)+0.114*(n&255))/255; }
+function draw(){ drawWheel(cvs,size,S.rot,theme(),active().length,true); }
+
+/* ---------- sizing: wheel fills the space ---------- */
+function resize(){
+  const st = $("stage").getBoundingClientRect();
+  size = Math.floor(Math.max(200, Math.min(st.width, st.height - 24, 720)));
+  cvs.style.width = size+"px"; cvs.style.height = size+"px";
+  draw();
+}
+new ResizeObserver(resize).observe($("stage"));
+window.addEventListener("orientationchange", ()=>setTimeout(resize,200));
+
+/* ---------- sound ---------- */
+let ac;
+function audio(){ if(!ac){ try{ ac = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(ac && ac.state==="suspended") ac.resume(); return ac; }
+function tick(){
+  if(!S.sound) return; const a=audio(); if(!a) return;
+  const o=a.createOscillator(), g=a.createGain(); o.type="triangle"; o.frequency.value=1400+Math.random()*200;
+  g.gain.setValueAtTime(0.18,a.currentTime); g.gain.exponentialRampToValueAtTime(0.001,a.currentTime+0.045);
+  o.connect(g).connect(a.destination); o.start(); o.stop(a.currentTime+0.05);
+}
+function fanfare(){
+  if(!S.sound) return; const a=audio(); if(!a) return;
+  [523.25,659.25,783.99,1046.5].forEach((f,i)=>{ const o=a.createOscillator(), g=a.createGain(), t0=a.currentTime+i*0.11;
+    o.type="square"; o.frequency.value=f; g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(0.12,t0+0.02); g.gain.exponentialRampToValueAtTime(0.001,t0+(i===3?0.6:0.2));
+    o.connect(g).connect(a.destination); o.start(t0); o.stop(t0+0.65); });
+}
+const IS_APP = /[?&]app=1/.test(location.search);
+function nativeVib(ms){ try{ prompt("vib", String(Math.max(1, Math.round(ms)))); }catch(e){} }
+function buzz(p){
+  if(!S.vibe) return;
+  if(IS_APP){
+    const arr = Array.isArray(p) ? p : [p]; let t = 0;
+    arr.forEach((d,i)=>{ if(i%2===0){ if(t===0) nativeVib(d); else setTimeout(()=>nativeVib(d), t); } t += d; });
+    return;
+  }
+  if(navigator.vibrate){ try{ navigator.vibrate(p); }catch(e){} }
+}
+
+/* ---------- spin ---------- */
+const TAU = Math.PI*2;
+function indexAt(rot){ const n=active().length; const seg=TAU/n; const a=((-rot)%TAU+TAU)%TAU; return Math.floor(a/seg)%n; }
+function spin(power=1){
+  if(S.spinning || active().length<2) return; audio(); $("result").hidden=true;
+  S.spinning=true; $("spinBtn").disabled=true;
+  const start=S.rot, extra = TAU*(5+Math.random()*3*power) + Math.random()*TAU, dur = 4200+Math.random()*1300*power;
+  const t0=performance.now(); let last=indexAt(start); buzz(15);
+  const ease = x => 1-Math.pow(1-x,4);
+  function frame(now){
+    const p=Math.min(1,(now-t0)/dur); S.rot = start + extra*ease(p); draw();
+    const idx=indexAt(S.rot);
+    if(idx!==last){ last=idx; tick(); buzz(8); const pt=$("pointer"); pt.classList.remove("bump"); void pt.offsetWidth; pt.classList.add("bump"); }
+    if(p<1) requestAnimationFrame(frame); else finish(idx);
+  }
+  requestAnimationFrame(frame);
+}
+function finish(idx){
+  S.spinning=false; S.rot%=TAU; renderElim();
+  S.last = active()[idx];
+  showResult(false);
+  fanfare(); buzz([60,40,120]); confetti(theme().segs);
+}
+$("spinBtn").onclick = ()=>spin(1);
+cvs.onclick = ()=>spin(1);
+$("againBtn").onclick = ()=>spin(1);
+
+/* ---------- eliminator mode ---------- */
+function showResult(champion){
+  const left = active();
+  $("winner").textContent = label(champion ? left[0] : S.last);
+  document.querySelector(".card .eyebrow").textContent = champion ? "Last one standing" : (S.elim ? "Picked" : "The wheel has chosen");
+  const ol=$("outList"); ol.innerHTML="";
+  if(S.elim && S.out.length){ S.out.forEach(i=>{ const sp=document.createElement("span"); sp.textContent=label(i); ol.appendChild(sp); }); ol.hidden=false; } else ol.hidden=true;
+  $("removeBtn").hidden = !S.elim || champion;
+  $("newRoundBtn").hidden = !champion;
+  $("againBtn").hidden = champion;
+  $("againBtn").className = S.elim ? "ghost" : "spin";
+  $("againBtn").textContent = S.elim ? "Keep them in & spin again" : "SPIN AGAIN";
+  $("result").hidden=false;
+}
+function renderElim(){
+  $("elimToggle").checked = S.elim;
+  const left = active().length;
+  $("elimStat").hidden = !S.elim;
+  $("elimLeft").textContent = left + " of " + S.n + " left";
+  $("elimReset").hidden = S.out.length===0;
+  $("spinBtn").textContent = (S.elim && left<2) ? "ROUND OVER" : "SPIN";
+  $("spinBtn").disabled = S.spinning || (S.elim && left<2);
+}
+function resetRound(){ S.out=[]; S.rot=0; renderElim(); draw(); }
+$("elimToggle").onchange = e=>{ if(S.spinning){ e.target.checked=S.elim; return; } S.elim=e.target.checked; store.set("elim",S.elim); resetRound();
+  setHint(S.elim ? "Eliminator on: knock out each pick until one is left" : "Tap SPIN, tap the wheel, or shake your phone"); };
+$("elimReset").onclick = resetRound;
+$("newRoundBtn").onclick = ()=>{ $("result").hidden=true; resetRound(); };
+$("removeBtn").onclick = ()=>{
+  if(S.last==null) return;
+  S.out.push(S.last); S.last=null; S.rot=0; renderElim(); draw();
+  if(active().length===1){ buzz([80,50,80,50,200]); fanfare(); confetti(theme().segs); showResult(true); }
+  else spin(1);
+};
+$("closeBtn").onclick = ()=>{ $("result").hidden=true; };
+
+/* ---------- shake to spin ---------- */
+let shakeOn=false, lastShake=0, lastAcc=null;
+function onMotion(e){
+  const a = e.accelerationIncludingGravity || e.acceleration; if(!a) return;
+  if(lastAcc){ const d=Math.abs(a.x-lastAcc.x)+Math.abs(a.y-lastAcc.y)+Math.abs(a.z-lastAcc.z);
+    const now=Date.now(); if(d>28 && now-lastShake>1500 && !S.spinning){ lastShake=now; spin(Math.min(1.6,d/28)); } }
+  lastAcc={x:a.x||0,y:a.y||0,z:a.z||0};
+}
+async function enableShake(){
+  if(typeof DeviceMotionEvent==="undefined"){ setHint("Shake isn't supported in this browser. Use the SPIN button."); return; }
+  try{ if(typeof DeviceMotionEvent.requestPermission==="function"){ const r=await DeviceMotionEvent.requestPermission(); if(r!=="granted"){ setHint("Motion access was declined. Use the SPIN button."); return; } } }
+  catch(e){ setHint("Motion sensors are blocked here. In the app version, shake works."); return; }
+  window.addEventListener("devicemotion",onMotion); shakeOn=true;
+  $("shakeBtn").textContent="📱 Shake is on";
+  if(!IS_APP) setTimeout(()=>{ if(!lastAcc) setHint("No motion sensor detected here. In the app version, shake works."); else setHint("Shake your phone to spin"); },1500);
+}
+function setHint(t){ $("hint").textContent=t; }
+$("shakeBtn").onclick = enableShake;
+
+/* ---------- player count ---------- */
+const countRow=$("countRow");
+for(let k=3;k<=8;k++){ const b=document.createElement("button"); b.className="chip"; b.textContent=k; b.setAttribute("role","radio"); b.id="c"+k;
+  b.onclick=()=>{ if(S.spinning) return; S.n=k; store.set("n",k); renderCount(); resetRound(); }; countRow.appendChild(b); }
+function renderCount(){ for(let k=3;k<=8;k++) $("c"+k).setAttribute("aria-checked", String(k===S.n)); }
+
+/* ---------- names ---------- */
+function openNames(){
+  const list=$("namesList"); list.innerHTML="";
+  for(let i=0;i<S.n;i++){
+    const l=document.createElement("label"), d=document.createElement("span"), inp=document.createElement("input");
+    d.className="dot"; d.style.background=theme().segs[i%8]; d.textContent=i+1;
+    inp.id="name"+i; inp.maxLength=16; inp.value=S.names[i]; inp.placeholder="Option "+(i+1); inp.autocomplete="off"; inp.enterKeyHint="next";
+    inp.oninput=()=>{ S.names[i]=inp.value; store.set("names",S.names); draw(); };
+    inp.onkeydown=e=>{ if(e.key==="Enter"){ const nx=$("name"+(i+1)); nx? nx.focus() : $("namesDone").click(); } };
+    l.append(d,inp); list.appendChild(l);
+  }
+  $("namesSheet").hidden=false;
+}
+$("editBtn").onclick=openNames;
+$("namesDone").onclick=()=>{ $("namesSheet").hidden=true; };
+
+/* ---------- themes ---------- */
+function renderThemes(){
+  ["freeThemes","proThemes"].forEach(id=>$(id).innerHTML="");
+  THEMES.forEach(t=>{
+    const b=document.createElement("button"); b.className="theme"; b.setAttribute("role","radio"); b.setAttribute("aria-checked",String(t.id===S.theme));
+    const c=document.createElement("canvas"); drawWheel(c,180,0.3,t,6,false);
+    const badge=document.createElement("span"); badge.className="badge"+(t.pro?"":" free");
+    badge.textContent = t.pro ? (S.premium?"Owned":"🔒 Pro") : "Free";
+    b.append(c, document.createTextNode(t.name), badge);
+    b.onclick=()=>{
+      if(t.pro && !S.premium){ $("premiumBox").scrollIntoView({behavior:"smooth",block:"center"}); $("premiumBox").animate([{transform:"scale(1)"},{transform:"scale(1.04)"},{transform:"scale(1)"}],{duration:300}); return; }
+      S.theme=t.id; store.set("theme",t.id); applyTheme(); renderThemes();
+    };
+    $(t.pro?"proThemes":"freeThemes").appendChild(b);
+  });
+  $("premiumBox").hidden = S.premium;
+}
+$("themeBtn").onclick=()=>{ renderThemes(); $("themeSheet").hidden=false; };
+$("themeDone").onclick=()=>{ $("themeSheet").hidden=true; };
+$("unlockBtn").onclick=()=>{ S.premium=true; store.set("premium",true); renderThemes(); };
+document.querySelectorAll(".scrim").forEach(s=>s.addEventListener("click",e=>{ if(e.target===s) s.hidden=true; }));
+
+/* ---------- toggles ---------- */
+function renderToggles(){ $("soundBtn").setAttribute("aria-pressed",String(S.sound)); $("soundBtn").textContent=S.sound?"🔊":"🔇"; $("vibeBtn").setAttribute("aria-pressed",String(S.vibe)); }
+$("soundBtn").onclick=()=>{ S.sound=!S.sound; store.set("sound",S.sound); renderToggles(); if(S.sound) tick(); };
+$("vibeBtn").onclick=()=>{ S.vibe=!S.vibe; store.set("vibe",S.vibe); renderToggles(); buzz(30); };
+
+/* ---------- confetti ---------- */
+const cf=$("confetti"), cg=cf.getContext("2d");
+function confetti(cols){
+  if(matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  cf.width=innerWidth; cf.height=innerHeight;
+  const ps=Array.from({length:140},()=>({x:innerWidth/2,y:innerHeight*0.45,vx:(Math.random()-.5)*14,vy:-Math.random()*14-4,r:Math.random()*6+4,c:cols[Math.random()*cols.length|0],a:Math.random()*6,va:(Math.random()-.5)*.3}));
+  let f=0; (function step(){ cg.clearRect(0,0,cf.width,cf.height);
+    ps.forEach(p=>{ p.vy+=0.35; p.vx*=0.99; p.x+=p.vx; p.y+=p.vy; p.a+=p.va; cg.save(); cg.translate(p.x,p.y); cg.rotate(p.a); cg.fillStyle=p.c; cg.fillRect(-p.r/2,-p.r/4,p.r,p.r/2); cg.restore(); });
+    if(++f<150) requestAnimationFrame(step); else cg.clearRect(0,0,cf.width,cf.height); })();
+}
+
+renderCount(); renderToggles(); renderElim(); applyTheme(); resize();
+if(IS_APP){ $("shakeBtn").hidden = true; enableShake(); setHint("Tap SPIN, tap the wheel, or shake your phone"); }
+document.fonts && document.fonts.ready.then(draw);
+})();
+</script>
+</body>
+</html>
